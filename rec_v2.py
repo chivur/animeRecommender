@@ -4,8 +4,13 @@ import xmltodict
 from bs4 import BeautifulSoup
 import sys
 from datetime import datetime
+import MySQLdb
 
 INF = 50000
+
+# db connection
+db = MySQLdb.connect("localhost","root","","anime")
+
 
 # filenames
 animelists_file = "lists.txt"
@@ -49,6 +54,8 @@ def getAnimeInfo(anime_id):
         rating = soup.find(class_="po-r js-statistics-info di-ib").getText().split("\n")[2][0:4]
     else:
         rating = rating.getText()
+    if rating.find("N/A") != -1:
+        rating = -1
     
     # Rank:
     rank = soup.find(class_="spaceit po-r js-statistics-info di-ib").getText()
@@ -210,17 +217,27 @@ def main():
     f = open("ids.txt","r")
     ids = f.read().split("\n")
     f.close()
-    ids = ids[0:10]
-    
+    ids = ids[3282:] #resume after previous failure
+    cursor = db.cursor()
+    query = ""
     
     # get the animeinfo for those animes
     animes = [] #[title,img_URL,rating,episode_number,#rank,genres]
     for id in ids:
-        animes.append(getAnimeInfo(id))
+        print id 
+        an = getAnimeInfo(id)
+        gnrs = ""
+        for genre in an[5]:
+            gnrs += genre+","
+        query = "insert into animes values(%s,'%s',%s,%s,%s,'%s','%s')" %(int(id),an[0],int(an[4]),float(an[2]),int(an[3]),an[1],gnrs[0:-1])
+        #print query
+        try:
+            cursor.execute(query)
+            db.commit()
+        except:
+            db.rollback()
+            
     
-    for an in animes:
-        print an
-        print "\n"
     
 ###populate user db
 
@@ -235,6 +252,10 @@ def main():
         print getUsername(al) + " " + getUserId(al) + getUserAnimeTitle(al,0)
         
     print "done"
-    
+    db.close()
+
+def mainn():
+    print getAnimeInfo("3786")
     
 main()
+
